@@ -1,4 +1,4 @@
-# ask-transcribe-cli
+# local-ai-cli
 
 Two tiny CLIs for **local** LLM and speech-to-text on macOS Apple Silicon —
 `ask` a warm local model, `transcribe` audio to text. Pure C++/Metal engines
@@ -10,7 +10,7 @@ Two tiny CLIs for **local** LLM and speech-to-text on macOS Apple Silicon —
 macOS Apple Silicon. One line — builds both engines, installs the CLIs:
 
 ```sh
-git clone https://github.com/stevederico/ask-transcribe-cli.git && cd ask-transcribe-cli && bash setup.sh
+git clone https://github.com/stevederico/local-ai-cli.git && cd local-ai-cli && bash setup.sh
 ```
 
 Then:
