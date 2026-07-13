@@ -39,8 +39,8 @@ xcode-select --install   # git + clang (skip if already installed)
 # + Homebrew installed (https://brew.sh)
 ```
 
-Also ensure `~/.local/bin` is on your `PATH`. LLM/STT models download from
-Hugging Face on first use.
+Also ensure `~/.local/bin` is on your `PATH`. The whisper model downloads during
+`setup.sh`; the LLM model downloads from Hugging Face on your first `ask`.
 
 ## Usage
 
@@ -105,7 +105,7 @@ transcribe audio.wav -- -osrt -of out     # pass extra whisper-cli flags after -
 
 | File | Does |
 |---|---|
-| `setup.sh` | builds both engines + symlinks everything |
+| `setup.sh` | installs deps (brew), builds both engines, symlinks all CLIs |
 | `install-llm.sh` | builds llama.cpp (Metal) → `~/.local/opt/llama.cpp` |
 | `install-stt.sh` | builds whisper.cpp + downloads `large-v3-turbo` |
 | `ask` | streams an answer from the warm LLM |
