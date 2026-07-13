@@ -5,6 +5,16 @@ Two tiny CLIs for **local** LLM and speech-to-text on macOS Apple Silicon —
 ([llama.cpp](https://github.com/ggml-org/llama.cpp) +
 [whisper.cpp](https://github.com/ggml-org/whisper.cpp)), **no Python**, no cloud.
 
+## Quick start
+
+macOS Apple Silicon. One line — builds both engines, installs the CLIs:
+
+```sh
+git clone https://github.com/stevederico/ask-transcribe-cli.git && cd ask-transcribe-cli && bash setup.sh
+```
+
+Then:
+
 ```sh
 ask "explain the CAP theorem in one line"
 echo "$(cat article.txt)" | ask "summarize this"
@@ -19,20 +29,17 @@ transcribe interview.mp3
   symlinks the CLIs, and downloads the whisper model.
 - **No runtime deps.** Both engines are C++ on ggml. No Python, no venv, no uvx.
 
-## Install
+## Prerequisites
 
-Requires macOS on Apple Silicon.
+The Quick start assumes these are installed:
 
 ```sh
-xcode-select --install          # git + clang (skip if already installed)
+xcode-select --install          # git + clang
 brew install cmake ffmpeg node  # build deps + audio prep + ask's JSON/SSE glue
-git clone https://github.com/stevederico/ask-transcribe-cli.git
-cd ask-transcribe-cli
-bash setup.sh                   # builds llama.cpp + whisper.cpp, downloads model
 ```
 
-Ensure `~/.local/bin` is on your `PATH`. Models download from Hugging Face on
-first use.
+Also ensure `~/.local/bin` is on your `PATH`. LLM/STT models download from
+Hugging Face on first use.
 
 ## Usage
 

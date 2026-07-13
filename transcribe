@@ -35,14 +35,32 @@ command -v whisper-cli >/dev/null || {
   echo "error: whisper-cli not on PATH (run $SELF_DIR/install-stt.sh)" >&2
   exit 1
 }
+command -v ffmpeg >/dev/null || {
+  echo "error: ffmpeg not found — needed to decode audio (brew install ffmpeg)" >&2
+  exit 1
+}
 [ -f "$MODEL" ] || {
   echo "error: model not found at $MODEL (run $SELF_DIR/install-stt.sh)" >&2
   exit 1
 }
 
+# whisper.cpp only reads 16 kHz mono WAV. Normalize every input through ffmpeg
+# (cheap for a WAV that's already correct; the only way mp3/flac/m4a work).
+TMP="$(mktemp -d)"
+trap 'rm -rf "$TMP"' EXIT
+WAVS=()
+i=0
+for f in "${FILES[@]}"; do
+  [ -f "$f" ] || { echo "error: no such file: $f" >&2; exit 1; }
+  w="$TMP/$((i++)).wav"
+  ffmpeg -nostdin -v error -i "$f" -ac 1 -ar 16000 "$w" </dev/null || {
+    echo "error: ffmpeg could not decode $f" >&2; exit 1; }
+  WAVS+=("$w")
+done
+
 ARGS=(-m "$MODEL" -l "$LANG" -nt)
 [ "${STT_TRANSLATE:-0}" = 1 ] && ARGS+=(-tr)
-ARGS+=("${FILES[@]}")
+ARGS+=("${WAVS[@]}")
 [ ${#EXTRA[@]} -gt 0 ] && ARGS+=("${EXTRA[@]}")
 
 if [ "${STT_VERBOSE:-0}" = 1 ]; then
