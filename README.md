@@ -1,0 +1,94 @@
+# ask-transcribe-cli
+
+Two tiny CLIs for **local** LLM and speech-to-text on macOS Apple Silicon —
+`ask` a warm local model, `transcribe` audio to text. Pure C++/Metal engines
+([llama.cpp](https://github.com/ggml-org/llama.cpp) +
+[whisper.cpp](https://github.com/ggml-org/whisper.cpp)), **no Python**, no cloud.
+
+```sh
+ask "explain the CAP theorem in one line"
+echo "$(cat article.txt)" | ask "summarize this"
+transcribe interview.mp3
+```
+
+## Why
+
+- **Warm server.** The LLM loads once and stays resident (`llm-server`), so
+  `ask` answers in ~3s instead of reloading a 12B model every call.
+- **One command.** `setup.sh` builds both engines from source (Metal GPU),
+  symlinks the CLIs, and downloads the whisper model.
+- **No runtime deps.** Both engines are C++ on ggml. No Python, no venv, no uvx.
+
+## Install
+
+Requires macOS on Apple Silicon.
+
+```sh
+xcode-select --install          # git + clang (skip if already installed)
+brew install cmake ffmpeg node  # build deps + audio prep + ask's JSON/SSE glue
+git clone https://github.com/stevederico/ask-transcribe-cli.git
+cd ask-transcribe-cli
+bash setup.sh                   # builds llama.cpp + whisper.cpp, downloads model
+```
+
+Ensure `~/.local/bin` is on your `PATH`. Models download from Hugging Face on
+first use.
+
+## Usage
+
+### `ask` — query the local LLM
+
+```sh
+ask "your question"
+echo "long text" | ask "summarize this"   # stdin is appended to the prompt
+```
+
+| Env | Default | Meaning |
+|---|---|---|
+| `LLM_PORT` | `8080` | server port |
+| `LLM_REASON` | `0` | set `1` to enable gemma's thinking (slower) |
+
+### `llm-server` — manage the warm daemon
+
+```sh
+llm-server start|stop|restart|status|log   # ask auto-starts it; manage by hand if you like
+```
+
+| Env | Default | Meaning |
+|---|---|---|
+| `LLM_PORT` | `8080` | server port |
+| `LLM_MODEL` | `ggml-org/gemma-4-12B-it-GGUF` | HF GGUF repo or local path; append `:Q4_K_M` etc. to pick a quant |
+| `LLM_NGL` | `999` | GPU layers (999 = all on Metal) |
+
+Prefers a locally cached **Q8_0** GGUF (loads with `-m`, no network). Lighter:
+`LLM_MODEL=ggml-org/gemma-4-E4B-it-GGUF`.
+
+### `transcribe` — audio to text
+
+```sh
+transcribe audio.wav
+transcribe clip.mp3 interview.flac        # multiple files
+transcribe audio.wav -- -osrt -of out     # pass extra whisper-cli flags after --
+```
+
+| Env | Default | Meaning |
+|---|---|---|
+| `STT_MODEL` | `large-v3-turbo` | whisper model path |
+| `STT_LANG` | `en` | source language |
+| `STT_TRANSLATE` | `0` | set `1` to translate to English |
+| `STT_VERBOSE` | `0` | set `1` to show whisper-cli's stderr |
+
+## What's in the box
+
+| File | Does |
+|---|---|
+| `setup.sh` | builds both engines + symlinks everything |
+| `install-llm.sh` | builds llama.cpp (Metal) → `~/.local/opt/llama.cpp` |
+| `install-stt.sh` | builds whisper.cpp + downloads `large-v3-turbo` |
+| `ask` | streams an answer from the warm LLM |
+| `llm-server` | start/stop/status the persistent model server |
+| `transcribe` | whisper.cpp wrapper with sane defaults |
+
+## License
+
+MIT

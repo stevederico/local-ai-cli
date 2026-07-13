@@ -1,0 +1,52 @@
+#!/usr/bin/env bash
+# transcribe — transcribe audio with local whisper.cpp. Model path is baked in;
+# extra whisper-cli flags pass through after --.
+#
+# Usage:
+#   transcribe audio.wav
+#   transcribe clip.mp3 interview.flac
+#   transcribe audio.wav -- -osrt -of /tmp/out
+#
+# Env: STT_MODEL (default large-v3-turbo), STT_LANG (default en), STT_TRANSLATE (set 1 for English)
+set -euo pipefail
+
+SELF_DIR="$(cd "$(dirname "$0")" && pwd)"
+OPT="$HOME/.local/opt/whisper.cpp"
+MODEL="${STT_MODEL:-$OPT/models/ggml-large-v3-turbo.bin}"
+LANG="${STT_LANG:-en}"
+
+FILES=()
+EXTRA=()
+while [ $# -gt 0 ]; do
+  case "$1" in
+    --) shift; EXTRA=("$@"); break ;;
+    -*) EXTRA+=("$1"); shift ;;
+    *)  FILES+=("$1"); shift ;;
+  esac
+done
+
+[ ${#FILES[@]} -gt 0 ] || {
+  echo "usage: transcribe <audio> [more audio …] [-- whisper-cli flags]" >&2
+  echo "example: transcribe recording.mp3" >&2
+  exit 1
+}
+
+command -v whisper-cli >/dev/null || {
+  echo "error: whisper-cli not on PATH (run $SELF_DIR/install-stt.sh)" >&2
+  exit 1
+}
+[ -f "$MODEL" ] || {
+  echo "error: model not found at $MODEL (run $SELF_DIR/install-stt.sh)" >&2
+  exit 1
+}
+
+ARGS=(-m "$MODEL" -l "$LANG" -nt)
+[ "${STT_TRANSLATE:-0}" = 1 ] && ARGS+=(-tr)
+ARGS+=("${FILES[@]}")
+[ ${#EXTRA[@]} -gt 0 ] && ARGS+=("${EXTRA[@]}")
+
+if [ "${STT_VERBOSE:-0}" = 1 ]; then
+  whisper-cli "${ARGS[@]}"
+else
+  whisper-cli "${ARGS[@]}" 2>/dev/null
+fi

@@ -1,0 +1,42 @@
+#!/usr/bin/env bash
+# ask — ask the local model a question. Starts the server if it isn't running,
+# then streams the answer. The server stays warm so follow-up asks are instant.
+#
+# Usage:
+#   ask "your question"
+#   echo "long text" | ask "summarize this"     # stdin is appended to the prompt
+#
+# Env: LLM_PORT (default 8080), LLM_REASON (set 1 to enable gemma thinking; default off)
+set -euo pipefail
+
+SELF_DIR="$(cd "$(dirname "$0")" && pwd)"
+PORT="${LLM_PORT:-8080}"
+HOST=127.0.0.1
+
+Q="$*"
+if [ ! -t 0 ]; then STDIN="$(cat)"; Q="${Q:+$Q
+
+}$STDIN"; fi
+[ -n "${Q// }" ] || { echo "usage: ask \"<question>\"   (or pipe text in)" >&2; exit 1; }
+
+curl -s "http://$HOST:$PORT/health" 2>/dev/null | grep -q '"status":"ok"' || "$SELF_DIR/llm-server" start >/dev/null
+
+REASON="none"; [ "${LLM_REASON:-0}" = 1 ] && REASON="medium"
+PAYLOAD="$(LLM_Q="$Q" LLM_R="$REASON" node -e 'process.stdout.write(JSON.stringify({messages:[{role:"user",content:process.env.LLM_Q}],max_tokens:2048,stream:true,reasoning_effort:process.env.LLM_R}))')"
+
+# stream the SSE response, printing only assistant content deltas
+curl -sN "http://$HOST:$PORT/v1/chat/completions" -H 'Content-Type: application/json' -d "$PAYLOAD" \
+  | node -e '
+    let buf="";
+    process.stdin.on("data",c=>{
+      buf+=c;
+      let i;
+      while((i=buf.indexOf("\n"))>=0){
+        const line=buf.slice(0,i).trim(); buf=buf.slice(i+1);
+        if(!line.startsWith("data:")) continue;
+        const p=line.slice(5).trim();
+        if(p==="[DONE]") continue;
+        try{ const d=JSON.parse(p).choices?.[0]?.delta?.content; if(d) process.stdout.write(d); }catch{}
+      }
+    }).on("end",()=>process.stdout.write("\n"));
+  '

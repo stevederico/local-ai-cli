@@ -1,0 +1,73 @@
+#!/usr/bin/env bash
+# llm-server — manage the persistent local LLM server (llama.cpp + gemma).
+# The model loads ONCE and stays warm, so queries are instant (no per-call reload).
+#
+# Usage: llm-server [start|stop|restart|status|log]   (default: start)
+#
+# Env overrides:
+#   LLM_PORT    default 8080
+#   LLM_MODEL   HF GGUF repo (default ggml-org/gemma-4-12B-it-GGUF); -hf resolves
+#               a cached file or downloads. Append :Q4_K_M etc. to pick a quant.
+#   LLM_NGL     GPU layers (default 999 = all on Metal)
+set -euo pipefail
+
+PORT="${LLM_PORT:-8080}"
+HOST=127.0.0.1
+MODEL="${LLM_MODEL:-ggml-org/gemma-4-12B-it-GGUF}"
+NGL="${LLM_NGL:-999}"
+STATE="$HOME/.local/state"; mkdir -p "$STATE"
+LOG="$STATE/llm-server.log"; PIDF="$STATE/llm-server.pid"
+
+up() { curl -s "http://$HOST:$PORT/health" 2>/dev/null | grep -q '"status":"ok"'; }
+
+# Prefer the locally cached GGUF (load with -m, no network). Fall back to -hf
+# (one-time download) only if nothing is cached. -hf on every start re-checks HF
+# and stalls on flaky connections / stale .downloadInProgress locks.
+resolve_args() {
+  if [ -f "$MODEL" ]; then echo "-m $MODEL"; return; fi
+  local repo="${MODEL%%:*}"
+  local dir="$HOME/.cache/huggingface/hub/models--${repo//\//--}"
+  rm -f "$dir"/blobs/*.downloadInProgress 2>/dev/null || true
+  # Prefer Q8_0 (verified clean); Q4_K_M from this repo shipped a broken template
+  # (floods <unused50>). Override the whole thing with LLM_MODEL=<path>.
+  local f
+  for pat in '*Q8_0.gguf' '*Q5_K*.gguf' '*Q4_K*.gguf' '*.gguf'; do
+    f="$(find "$dir" -name "$pat" ! -name 'mmproj*' 2>/dev/null | head -1)"
+    [ -n "$f" ] && { echo "-m $f"; return; }
+  done
+  echo "-hf $MODEL"
+}
+
+start() {
+  if up; then echo "already running on :$PORT"; return 0; fi
+  command -v llama-server >/dev/null || { echo "error: llama-server not on PATH (run llm/install-llm.sh)" >&2; exit 1; }
+  echo "starting local model server (loads the model once; ~15s for 12B)…" >&2
+  # shellcheck disable=SC2046
+  nohup llama-server $(resolve_args) --jinja -ngl "$NGL" \
+    --host "$HOST" --port "$PORT" >"$LOG" 2>&1 &
+  echo $! > "$PIDF"
+  for _ in $(seq 1 90); do up && { echo "ready on http://$HOST:$PORT"; return 0; }; sleep 1; done
+  echo "error: server did not become ready — see: llm-server log" >&2; exit 1
+}
+
+stop() {
+  # Started via -m <cached-path> or -hf <repo>; kill by the PID we recorded
+  # (grepping the command line misses the -m path). Fall back to a name match.
+  if [ -f "$PIDF" ] && kill "$(cat "$PIDF")" 2>/dev/null; then
+    echo "stopped"
+  elif pkill -f "llama-server .*--port $PORT" 2>/dev/null; then
+    echo "stopped"
+  else
+    echo "not running"
+  fi
+  rm -f "$PIDF"
+}
+
+case "${1:-start}" in
+  start)   start ;;
+  stop)    stop ;;
+  restart) stop; sleep 1; start ;;
+  status)  up && echo "running on :$PORT" || echo "not running" ;;
+  log)     tail -n 40 -f "$LOG" ;;
+  *)       echo "usage: llm-server [start|stop|restart|status|log]" >&2; exit 1 ;;
+esac
