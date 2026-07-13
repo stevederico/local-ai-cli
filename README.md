@@ -63,6 +63,20 @@ llm-server start|stop|restart|status|log   # ask auto-starts it; manage by hand 
 Prefers a locally cached **Q8_0** GGUF (loads with `-m`, no network). Lighter:
 `LLM_MODEL=ggml-org/gemma-4-E4B-it-GGUF`.
 
+### Recommended models
+
+Point `LLM_MODEL` at any GGUF repo (or local path); `llm-server` downloads it on
+first start. All sizes are for the default quant.
+
+| Use | `LLM_MODEL` | Size | Notes |
+|---|---|---|---|
+| **Default** | `ggml-org/gemma-4-12B-it-GGUF` (Q8_0) | ~13 GB | best balance, ~23 tok/s. **Avoid this repo's Q4_K_M** — broken template floods `<unused50>`; stick to Q8_0 |
+| Light / low-RAM | `ggml-org/gemma-4-E4B-it-GGUF` | ~4 GB | faster, weaker |
+| Tiny / edge | `ggml-org/gemma-4-E2B-it-GGUF` | ~2 GB | smallest |
+| Smarter reasoning | NVIDIA **Nemotron** (e.g. Nemotron Nano / Super, community GGUF) | ~9–30 GB | stronger reasoning; pick a GGUF quant that fits your RAM |
+
+Skip 70B-class models on a laptop — too slow to be pleasant.
+
 ### `transcribe` — audio to text
 
 ```sh
