@@ -31,11 +31,12 @@ transcribe interview.mp3
 
 ## Prerequisites
 
-The Quick start assumes these are installed:
+`setup.sh` auto-installs its build deps (`cmake`, `ffmpeg`, `node`) via
+[Homebrew](https://brew.sh). You only need the two things brew can't provide:
 
 ```sh
-xcode-select --install          # git + clang
-brew install cmake ffmpeg node  # build deps + audio prep + ask's JSON/SSE glue
+xcode-select --install   # git + clang (skip if already installed)
+# + Homebrew installed (https://brew.sh)
 ```
 
 Also ensure `~/.local/bin` is on your `PATH`. LLM/STT models download from
