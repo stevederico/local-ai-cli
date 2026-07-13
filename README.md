@@ -72,10 +72,11 @@ first start. All sizes are for the default quant.
 |---|---|---|---|
 | **Default** | `ggml-org/gemma-4-12B-it-GGUF` (Q8_0) | ~13 GB | best balance, ~23 tok/s. **Avoid this repo's Q4_K_M** — broken template floods `<unused50>`; stick to Q8_0 |
 | Light / low-RAM | `ggml-org/gemma-4-E4B-it-GGUF` | ~4 GB | faster, weaker |
+| Light (official Nemotron) | `nvidia/NVIDIA-Nemotron-3-Nano-4B-GGUF` | ~2.5 GB | NVIDIA-published GGUF (Q4_K_M only) |
 | Tiny / edge | `ggml-org/gemma-4-E2B-it-GGUF` | ~2 GB | smallest |
-| Smarter reasoning | NVIDIA **Nemotron** (e.g. Nemotron Nano / Super, community GGUF) | ~9–30 GB | stronger reasoning; pick a GGUF quant that fits your RAM |
+| Smarter reasoning | `unsloth/NVIDIA-Nemotron-3-Nano-30B-A3B-GGUF` | ~18–30 GB | 30B MoE, strong reasoning. Community quant (no official GGUF at this size); pick one that fits RAM |
 
-Skip 70B-class models on a laptop — too slow to be pleasant.
+Skip 70B+ dense and the 120B/550B Nemotrons on a laptop — too slow to be pleasant.
 
 ### `transcribe` — audio to text
 
