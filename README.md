@@ -1,19 +1,44 @@
 # local-ai-cli
 
-Two tiny CLIs for **local** LLM and speech-to-text on macOS Apple Silicon —
-`ask` a warm local model, `transcribe` audio to text. Pure C++/Metal engines
+Install scripts + thin bash wrappers for local LLM and STT on macOS Apple Silicon
 ([llama.cpp](https://github.com/ggml-org/llama.cpp) +
-[whisper.cpp](https://github.com/ggml-org/whisper.cpp)), **no Python**, no cloud.
+[whisper.cpp](https://github.com/ggml-org/whisper.cpp)).
 
-## Quick start
+**Prefer the dottie CLIs** — same jobs, HTTP/MCP too:
 
-macOS Apple Silicon. One line — builds both engines, installs the CLIs:
+| Job | Use |
+|---|---|
+| Ask a local model | [`dottie-local ask`](https://github.com/stevederico/dottie-local) |
+| Transcribe / speak | [`dottie-talk`](https://github.com/stevederico/dottie-talk) |
+
+```sh
+dottie-local ask "explain the CAP theorem in one line"
+dottie-talk transcribe interview.wav
+dottie-talk speak "hello" -o hello.wav
+```
+
+This repo still builds the engines and ships `ask` / `transcribe` / `llm-server` if you want zero-Node shell tools. `dottie-local` reuses a healthy `llama-server` on `:8080` (including one started by `llm-server` here).
+
+## Quick start (dottie)
+
+```sh
+# tokens (needs llama-server on PATH — install-llm.sh below, or your own build)
+git clone https://github.com/stevederico/dottie-local.git && cd dottie-local && npm install
+dottie-local ask "hello"
+
+# voice
+git clone https://github.com/stevederico/dottie-talk.git && cd dottie-talk && npm install
+dottie-talk transcribe clip.wav
+dottie-talk speak "hi" -o hi.wav
+```
+
+## Quick start (this repo — engines + bash CLIs)
+
+macOS Apple Silicon. Builds both engines, installs the bash CLIs:
 
 ```sh
 git clone https://github.com/stevederico/local-ai-cli.git && cd local-ai-cli && bash setup.sh
 ```
-
-Then:
 
 ```sh
 ask "explain the CAP theorem in one line"
@@ -21,77 +46,72 @@ echo "$(cat article.txt)" | ask "summarize this"
 transcribe interview.mp3
 ```
 
-## Why
+## Why two layers
 
-- **Warm server.** The LLM loads once and stays resident (`llm-server`), so
-  `ask` answers in ~3s instead of reloading a 12B model every call.
-- **One command.** `setup.sh` builds both engines from source (Metal GPU),
-  symlinks the CLIs, and downloads the whisper model.
-- **No runtime deps.** Both engines are C++ on ggml. No Python, no venv, no uvx.
+- **dottie-local / dottie-talk** — Node façade: CLI + HTTP + MCP. Prefer these day to day.
+- **local-ai-cli** — build Metal engines from source, optional bare bash (`ask`, `transcribe`, `llm-server`). No Python runtime for the engines.
 
 ## Prerequisites
 
-`setup.sh` auto-installs its build deps (`cmake`, `ffmpeg`, `node`) via
-[Homebrew](https://brew.sh). You only need the two things brew can't provide:
+`setup.sh` auto-installs build deps (`cmake`, `ffmpeg`, `node`) via
+[Homebrew](https://brew.sh). You only need:
 
 ```sh
 xcode-select --install   # git + clang (skip if already installed)
 # + Homebrew installed (https://brew.sh)
 ```
 
-Also ensure `~/.local/bin` is on your `PATH`. The whisper model downloads during
-`setup.sh`; the LLM model downloads from Hugging Face on your first `ask`.
+Ensure `~/.local/bin` is on your `PATH`. Whisper model downloads during `setup.sh`;
+the LLM GGUF downloads from Hugging Face on first ask (bash or dottie-local).
 
-## Usage
+## Bash usage (legacy / zero-Node)
 
-### `ask` — query the local LLM
+### `ask`
 
 ```sh
 ask "your question"
-echo "long text" | ask "summarize this"   # stdin is appended to the prompt
+echo "long text" | ask "summarize this"
 ```
 
 | Env | Default | Meaning |
 |---|---|---|
 | `LLM_PORT` | `8080` | server port |
-| `LLM_REASON` | `0` | set `1` to enable gemma's thinking (slower) |
+| `LLM_REASON` | `0` | set `1` to enable gemma thinking (slower) |
 
-### `llm-server` — manage the warm daemon
+### `llm-server`
 
 ```sh
-llm-server start|stop|restart|status|log   # ask auto-starts it; manage by hand if you like
+llm-server start|stop|restart|status|log
 ```
 
 | Env | Default | Meaning |
 |---|---|---|
 | `LLM_PORT` | `8080` | server port |
-| `LLM_MODEL` | `ggml-org/gemma-4-12B-it-GGUF` | HF GGUF repo or local path; append `:Q4_K_M` etc. to pick a quant |
+| `LLM_MODEL` | `ggml-org/gemma-4-12B-it-GGUF` | HF GGUF repo or local path; append `:Q4_K_M` etc. for quant |
 | `LLM_NGL` | `999` | GPU layers (999 = all on Metal) |
 
-Prefers a locally cached **Q8_0** GGUF (loads with `-m`, no network). Lighter:
-`LLM_MODEL=ggml-org/gemma-4-E4B-it-GGUF`.
+Prefers cached **Q8_0**. Lighter: `LLM_MODEL=ggml-org/gemma-4-E4B-it-GGUF`.
 
 ### Recommended models
 
-Point `LLM_MODEL` at any GGUF repo (or local path); `llm-server` downloads it on
-first start. All sizes are for the default quant.
-
 | Use | `LLM_MODEL` | Size | Notes |
 |---|---|---|---|
-| **Default** | `ggml-org/gemma-4-12B-it-GGUF` (Q8_0) | ~13 GB | best balance, ~23 tok/s. **Avoid this repo's Q4_K_M** — broken template floods `<unused50>`; stick to Q8_0 |
+| **Default** | `ggml-org/gemma-4-12B-it-GGUF` (Q8_0) | ~13 GB | best balance. **Avoid this repo's Q4_K_M** — broken template floods `<unused50>` |
 | Light / low-RAM | `ggml-org/gemma-4-E4B-it-GGUF` | ~4 GB | faster, weaker |
-| Light (official Nemotron) | `nvidia/NVIDIA-Nemotron-3-Nano-4B-GGUF` | ~2.5 GB | NVIDIA-published GGUF (Q4_K_M only) |
+| Light (official Nemotron) | `nvidia/NVIDIA-Nemotron-3-Nano-4B-GGUF` | ~2.5 GB | Q4_K_M only |
 | Tiny / edge | `ggml-org/gemma-4-E2B-it-GGUF` | ~2 GB | smallest |
-| Smarter reasoning | `unsloth/NVIDIA-Nemotron-3-Nano-30B-A3B-GGUF` | ~18–30 GB | 30B MoE, strong reasoning. Community quant (no official GGUF at this size); pick one that fits RAM |
+| Smarter reasoning | `unsloth/NVIDIA-Nemotron-3-Nano-30B-A3B-GGUF` | ~18–30 GB | 30B MoE; pick quant that fits RAM |
 
-Skip 70B+ dense and the 120B/550B Nemotrons on a laptop — too slow to be pleasant.
+Skip 70B+ dense on a laptop.
 
-### `transcribe` — audio to text
+### `transcribe`
+
+Batch whisper.cpp (files). For realtime / TTS use **dottie-talk**.
 
 ```sh
 transcribe audio.wav
-transcribe clip.mp3 interview.flac        # multiple files
-transcribe audio.wav -- -osrt -of out     # pass extra whisper-cli flags after --
+transcribe clip.mp3 interview.flac
+transcribe audio.wav -- -osrt -of out
 ```
 
 | Env | Default | Meaning |
@@ -99,18 +119,24 @@ transcribe audio.wav -- -osrt -of out     # pass extra whisper-cli flags after -
 | `STT_MODEL` | `large-v3-turbo` | whisper model path |
 | `STT_LANG` | `en` | source language |
 | `STT_TRANSLATE` | `0` | set `1` to translate to English |
-| `STT_VERBOSE` | `0` | set `1` to show whisper-cli's stderr |
+| `STT_VERBOSE` | `0` | set `1` to show whisper-cli stderr |
 
 ## What's in the box
 
 | File | Does |
 |---|---|
-| `setup.sh` | installs deps (brew), builds both engines, symlinks all CLIs |
+| `setup.sh` | brew deps, builds both engines, symlinks bash CLIs |
 | `install-llm.sh` | builds llama.cpp (Metal) → `~/.local/opt/llama.cpp` |
 | `install-stt.sh` | builds whisper.cpp + downloads `large-v3-turbo` |
 | `ask` | streams an answer from the warm LLM |
 | `llm-server` | start/stop/status the persistent model server |
 | `transcribe` | whisper.cpp wrapper with sane defaults |
+
+## Related
+
+- [dottie-local](https://github.com/stevederico/dottie-local) — `ask` / agent / HTTP / MCP over llama.cpp
+- [dottie-talk](https://github.com/stevederico/dottie-talk) — `speak` / `transcribe` / HTTP / MCP (parakeet + koko)
+- [dottie-desktop](https://github.com/stevederico/dottie-desktop) — desktop app
 
 ## License
 
